@@ -1,597 +1,561 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JERCAT DEX - Professional Trading Platform</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @keyframes blob {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            25% { transform: translate(20px, -50px) scale(1.1); }
-            50% { transform: translate(-20px, 20px) scale(0.9); }
-            75% { transform: translate(50px, 50px) scale(1.05); }
-        }
-        .animate-blob {
-            animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-            animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-            animation-delay: 4s;
-        }
-        .gradient-text {
-            background: linear-gradient(to right, #a855f7, #ec4899, #3b82f6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-    </style>
-</head>
-<body class="bg-slate-950">
-    <!-- Main Container -->
-    <div id="app"></div>
+# 🚀 JERCAT Token - Complete Deployment Guide
 
-    <script>
-        // ========================================
-        // COMPLETE JERCAT SYSTEM
-        // ========================================
-        
-        const App = {
-            state: {
-                // DEX State
-                currentView: 'dex',
-                walletConnected: false,
-                walletAddress: '',
-                selectedChain: 'ethereum',
-                fromToken: { symbol: 'ETH', price: 3000, logo: '⟠' },
-                toToken: { symbol: 'USDC', price: 1, logo: '💵' },
-                fromAmount: '',
-                toAmount: '',
-                approvalStatus: 'none',
-                
-                // JERCAT Token
-                jercatBalance: 0,
-                jercatPrice: 0.15,
-                
-                // Trading Bot State
-                botStatus: 'stopped',
-                botConfig: {
-                    buyDipPercentage: 5,
-                    takeProfitPercentage: 10,
-                    stopLossPercentage: 5,
-                    buyAmountETH: 0.1,
-                    dcaEnabled: true
-                },
-                botStats: {
-                    totalTrades: 0,
-                    winRate: 0,
-                    totalProfit: 0
-                },
-                trades: [],
-                logs: []
-            },
+## 📋 Table of Contents
+1. [Smart Contracts Overview](#smart-contracts-overview)
+2. [Prerequisites](#prerequisites)
+3. [Installation](#installation)
+4. [Deployment Steps](#deployment-steps)
+5. [Verification](#verification)
+6. [Integration with DEX](#integration-with-dex)
+7. [Testing](#testing)
+8. [Security Checklist](#security-checklist)
 
-            chains: [
-                { id: 'ethereum', name: 'Ethereum', icon: '⟠', color: 'from-blue-500 to-cyan-500' },
-                { id: 'bsc', name: 'BSC', icon: '🔶', color: 'from-yellow-500 to-orange-500' },
-                { id: 'polygon', name: 'Polygon', icon: '🟣', color: 'from-purple-500 to-pink-500' },
-                { id: 'arbitrum', name: 'Arbitrum', icon: '🔵', color: 'from-blue-600 to-indigo-600' }
-            ],
+---
 
-            tokens: {
-                ethereum: [
-                    { symbol: 'ETH', price: 3000, logo: '⟠' },
-                    { symbol: 'USDC', price: 1, logo: '💵' },
-                    { symbol: 'USDT', price: 1, logo: '💲' },
-                    { symbol: 'WBTC', price: 45000, logo: '₿' }
-                ],
-                bsc: [
-                    { symbol: 'BNB', price: 300, logo: '🔶' },
-                    { symbol: 'USDT', price: 1, logo: '💲' }
-                ],
-                polygon: [
-                    { symbol: 'MATIC', price: 0.8, logo: '🟣' },
-                    { symbol: 'USDC', price: 1, logo: '💵' }
-                ],
-                arbitrum: [
-                    { symbol: 'ETH', price: 3000, logo: '⟠' },
-                    { symbol: 'USDC', price: 1, logo: '💵' }
-                ]
-            },
+## 📜 Smart Contracts Overview
 
-            // Connect Wallet
-            connectWallet() {
-                if (typeof window.ethereum !== 'undefined') {
-                    this.state.walletConnected = true;
-                    this.state.walletAddress = '0x' + Math.random().toString(16).substr(2, 8) + '...';
-                    this.state.jercatBalance = (Math.random() * 1000).toFixed(2);
-                    this.addLog('success', 'Wallet connected successfully');
-                    this.render();
-                } else {
-                    alert('Please install MetaMask');
-                }
-            },
+### **1. JercatToken.sol**
+Main ERC-20 token with advanced features:
+- ✅ **100M Max Supply** (50M initial mint)
+- ✅ **Tier System** (Bronze, Silver, Gold, Diamond)
+- ✅ **Staking Rewards** (30% APY)
+- ✅ **Gas Payment** (Pay gas with JERCAT)
+- ✅ **Fee Discounts** (10% to 100% off)
+- ✅ **Deflationary** (Burn mechanism)
+- ✅ **ERC-20 Permit** (Gasless approvals)
 
-            // Calculate swap output
-            calculateOutput(input) {
-                if (!input) return '';
-                const rate = this.state.fromToken.price / this.state.toToken.price;
-                return (parseFloat(input) * rate * 0.997).toFixed(6);
-            },
+### **2. JercatDEXRouter.sol**
+DEX router with 0.001% platform fee:
+- ✅ **Multi-DEX Support** (Uniswap, Sushiswap, etc.)
+- ✅ **JERCAT Discounts** (Based on user tier)
+- ✅ **Fee Collection** (Automatic to recipient)
+- ✅ **Slippage Protection**
 
-            // Execute swap
-            executeSwap() {
-                if (!this.state.walletConnected) {
-                    alert('Please connect your wallet');
-                    return;
-                }
-                if (!this.state.fromAmount) {
-                    alert('Please enter an amount');
-                    return;
-                }
+### **3. JercatTokenSale.sol**
+Public sale contract:
+- ✅ **Buy with ETH**
+- ✅ **Price Configurable**
+- ✅ **Min/Max Purchase Limits**
+- ✅ **Time-Limited Sales**
 
-                const trade = {
-                    id: Date.now(),
-                    type: 'swap',
-                    from: this.state.fromToken.symbol,
-                    to: this.state.toToken.symbol,
-                    amount: this.state.fromAmount,
-                    timestamp: new Date().toISOString()
-                };
+---
 
-                this.state.trades.unshift(trade);
-                this.addLog('success', `Swapped ${this.state.fromAmount} ${this.state.fromToken.symbol} to ${this.state.toAmount} ${this.state.toToken.symbol}`);
-                
-                alert('✅ Swap executed successfully!');
-                this.state.fromAmount = '';
-                this.state.toAmount = '';
-                this.render();
-            },
+## 🛠️ Prerequisites
 
-            // Buy JERCAT
-            buyJercat(amount) {
-                if (!this.state.walletConnected) {
-                    alert('Please connect wallet');
-                    return;
-                }
+### Software Required
+```bash
+# Node.js 18+
+node --version
 
-                const tokens = (amount / this.state.jercatPrice).toFixed(2);
-                this.state.jercatBalance = parseFloat(this.state.jercatBalance) + parseFloat(tokens);
-                
-                this.addLog('success', `Bought ${tokens} JERCAT for $${amount}`);
-                alert(`✅ Purchase successful!\n\nReceived: ${tokens} JERCAT 🐱`);
-                this.render();
-            },
+# Hardhat
+npm install --save-dev hardhat
 
-            // Trading Bot Controls
-            toggleBot() {
-                if (this.state.botStatus === 'running') {
-                    this.state.botStatus = 'paused';
-                    this.addLog('warning', 'Bot paused');
-                } else {
-                    this.state.botStatus = 'running';
-                    this.addLog('success', 'Bot started');
-                    this.simulateTrading();
-                }
-                this.render();
-            },
+# OpenZeppelin Contracts
+npm install @openzeppelin/contracts
 
-            simulateTrading() {
-                if (this.state.botStatus !== 'running') return;
+# Hardhat Plugins
+npm install --save-dev @nomicfoundation/hardhat-toolbox
+npm install --save-dev @nomicfoundation/hardhat-verify
+```
 
-                setTimeout(() => {
-                    if (Math.random() > 0.5) {
-                        const profit = (Math.random() * 50 - 10).toFixed(2);
-                        this.state.botStats.totalTrades++;
-                        this.state.botStats.totalProfit += parseFloat(profit);
-                        this.state.botStats.winRate = ((this.state.botStats.totalProfit > 0 ? 1 : 0) * 100).toFixed(1);
-                        
-                        this.addLog(profit > 0 ? 'success' : 'error', 
-                            `Trade executed: ${profit > 0 ? '+' : ''}$${profit}`);
-                        this.render();
-                    }
-                    
-                    this.simulateTrading();
-                }, 10000);
-            },
+### Environment Setup
+Create `.env` file:
+```bash
+# Network RPC URLs
+MAINNET_RPC_URL=https://eth.llamarpc.com
+GOERLI_RPC_URL=https://goerli.infura.io/v3/YOUR_KEY
+BSC_RPC_URL=https://bsc-dataseed.binance.org
+POLYGON_RPC_URL=https://polygon-rpc.com
 
-            // Logging
-            addLog(type, message) {
-                this.state.logs.unshift({
-                    id: Date.now(),
-                    type,
-                    message,
-                    timestamp: new Date().toLocaleTimeString()
-                });
-                
-                if (this.state.logs.length > 50) {
-                    this.state.logs = this.state.logs.slice(0, 50);
-                }
-            },
+# Private Keys
+DEPLOYER_PRIVATE_KEY=your_private_key_here
 
-            // Switch tokens
-            switchTokens() {
-                const temp = this.state.fromToken;
-                this.state.fromToken = this.state.toToken;
-                this.state.toToken = temp;
-                this.state.fromAmount = this.state.toAmount;
-                this.state.toAmount = '';
-                this.render();
-            },
+# Etherscan API Keys (for verification)
+ETHERSCAN_API_KEY=your_etherscan_api_key
+BSCSCAN_API_KEY=your_bscscan_api_key
+POLYGONSCAN_API_KEY=your_polygonscan_api_key
 
-            // Render UI
-            render() {
-                const app = document.getElementById('app');
-                
-                app.innerHTML = `
-                    <!-- Animated Background -->
-                    <div class="fixed inset-0 overflow-hidden pointer-events-none">
-                        <div class="absolute top-20 left-10 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
-                        <div class="absolute top-40 right-10 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
-                        <div class="absolute bottom-20 left-1/2 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
-                    </div>
+# Contract Addresses (will be filled after deployment)
+JERCAT_TOKEN_ADDRESS=
+JERCAT_DEX_ROUTER_ADDRESS=
+JERCAT_SALE_ADDRESS=
 
-                    <div class="relative z-10 min-h-screen p-4">
-                        <!-- Header -->
-                        <header class="max-w-7xl mx-auto mb-8">
-                            <div class="text-center pt-8 mb-8">
-                                <h1 class="text-6xl font-black gradient-text mb-2">JERCAT DEX</h1>
-                                <p class="text-purple-300 text-xl">Professional Trading Platform with AI Bot</p>
-                            </div>
+# Fee Recipient
+FEE_RECIPIENT_ADDRESS=your_metamask_address
+```
 
-                            <!-- Navigation -->
-                            <div class="flex justify-center gap-4 mb-6">
-                                <button onclick="app.state.currentView = 'dex'; app.render();" 
-                                    class="px-6 py-3 rounded-xl font-bold transition-all ${this.state.currentView === 'dex' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-400'}">
-                                    🔄 DEX Trading
-                                </button>
-                                <button onclick="app.state.currentView = 'jercat'; app.render();" 
-                                    class="px-6 py-3 rounded-xl font-bold transition-all ${this.state.currentView === 'jercat' ? 'bg-yellow-600 text-white' : 'bg-slate-800 text-gray-400'}">
-                                    🐱 JERCAT Token
-                                </button>
-                                <button onclick="app.state.currentView = 'bot'; app.render();" 
-                                    class="px-6 py-3 rounded-xl font-bold transition-all ${this.state.currentView === 'bot' ? 'bg-green-600 text-white' : 'bg-slate-800 text-gray-400'}">
-                                    🤖 Trading Bot
-                                </button>
-                            </div>
+---
 
-                            <!-- Wallet Status -->
-                            <div class="max-w-2xl mx-auto">
-                                ${!this.state.walletConnected ? `
-                                    <button onclick="app.connectWallet()" 
-                                        class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all">
-                                        🔐 Connect MetaMask Wallet
-                                    </button>
-                                ` : `
-                                    <div class="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
-                                        <div class="flex items-center justify-between">
-                                            <div class="flex items-center gap-3">
-                                                <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                                                <span class="text-green-400 font-bold">Connected</span>
-                                            </div>
-                                            <div class="flex items-center gap-4">
-                                                <div class="text-right">
-                                                    <div class="text-xs text-gray-400">JERCAT Balance</div>
-                                                    <div class="text-yellow-400 font-bold">🐱 ${this.state.jercatBalance}</div>
-                                                </div>
-                                                <span class="text-gray-300 font-mono text-sm">${this.state.walletAddress}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `}
-                            </div>
-                        </header>
+## 📦 Installation
 
-                        <main class="max-w-7xl mx-auto">
-                            ${this.state.currentView === 'dex' ? this.renderDEX() : ''}
-                            ${this.state.currentView === 'jercat' ? this.renderJercat() : ''}
-                            ${this.state.currentView === 'bot' ? this.renderBot() : ''}
-                        </main>
+### Step 1: Create Hardhat Project
+```bash
+mkdir jercat-contracts
+cd jercat-contracts
+npm init -y
+npm install --save-dev hardhat
+npx hardhat init
+```
 
-                        <!-- Live Logs -->
-                        <div class="max-w-7xl mx-auto mt-8">
-                            <div class="bg-slate-900/80 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/20">
-                                <h3 class="text-xl font-bold text-white mb-4">📝 Live Activity Log</h3>
-                                <div class="bg-slate-950 rounded-xl p-4 max-h-64 overflow-y-auto font-mono text-xs">
-                                    ${this.state.logs.length === 0 ? 
-                                        '<div class="text-gray-500 text-center py-4">No activity yet</div>' :
-                                        this.state.logs.map(log => `
-                                            <div class="mb-2 flex items-start gap-3 ${
-                                                log.type === 'error' ? 'text-red-400' :
-                                                log.type === 'warning' ? 'text-yellow-400' :
-                                                log.type === 'success' ? 'text-green-400' :
-                                                'text-gray-300'
-                                            }">
-                                                <span class="text-gray-500">[${log.timestamp}]</span>
-                                                <span>${log.message}</span>
-                                            </div>
-                                        `).join('')
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            },
+### Step 2: Install Dependencies
+```bash
+npm install @openzeppelin/contracts
+npm install --save-dev @nomicfoundation/hardhat-toolbox
+npm install --save-dev @nomicfoundation/hardhat-verify
+npm install dotenv
+```
 
-            renderDEX() {
-                return `
-                    <div class="max-w-2xl mx-auto">
-                        <!-- Chain Selector -->
-                        <div class="bg-slate-900/80 backdrop-blur-xl rounded-3xl p-6 border border-purple-500/20 mb-6">
-                            <h3 class="text-white font-bold text-lg mb-4">Select Network</h3>
-                            <div class="grid grid-cols-4 gap-3">
-                                ${this.chains.map(chain => `
-                                    <button onclick="app.state.selectedChain = '${chain.id}'; app.render();"
-                                        class="p-4 rounded-xl transition-all ${
-                                            this.state.selectedChain === chain.id
-                                                ? `bg-gradient-to-br ${chain.color} shadow-xl scale-105`
-                                                : 'bg-slate-800/50 hover:bg-slate-700/50'
-                                        }">
-                                        <div class="text-3xl mb-2">${chain.icon}</div>
-                                        <div class="text-xs font-bold ${this.state.selectedChain === chain.id ? 'text-white' : 'text-gray-400'}">
-                                            ${chain.name}
-                                        </div>
-                                    </button>
-                                `).join('')}
-                            </div>
-                        </div>
+### Step 3: Configure Hardhat
+Create `hardhat.config.js`:
+```javascript
+require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-verify");
+require("dotenv").config();
 
-                        <!-- Swap Card -->
-                        <div class="bg-slate-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/20">
-                            <!-- From Token -->
-                            <div class="mb-2">
-                                <label class="text-sm text-gray-400 mb-3 block font-semibold">You Pay</label>
-                                <div class="bg-slate-800/50 rounded-2xl p-6 border-2 border-slate-700 hover:border-purple-500/50 transition-all">
-                                    <div class="flex justify-between items-center">
-                                        <input type="number" 
-                                            value="${this.state.fromAmount}"
-                                            oninput="app.state.fromAmount = this.value; app.state.toAmount = app.calculateOutput(this.value); app.render();"
-                                            placeholder="0.00"
-                                            class="flex-1 bg-transparent text-white text-4xl outline-none font-bold placeholder-gray-600">
-                                        <div class="flex items-center gap-3 bg-slate-700 px-4 py-3 rounded-xl">
-                                            <span class="text-3xl">${this.state.fromToken.logo}</span>
-                                            <div class="text-white font-bold">${this.state.fromToken.symbol}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+module.exports = {
+  solidity: {
+    version: "0.8.20",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200
+      }
+    }
+  },
+  networks: {
+    // Ethereum Mainnet
+    mainnet: {
+      url: process.env.MAINNET_RPC_URL,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY],
+      chainId: 1
+    },
+    // Goerli Testnet
+    goerli: {
+      url: process.env.GOERLI_RPC_URL,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY],
+      chainId: 5
+    },
+    // BSC Mainnet
+    bsc: {
+      url: process.env.BSC_RPC_URL,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY],
+      chainId: 56
+    },
+    // Polygon Mainnet
+    polygon: {
+      url: process.env.POLYGON_RPC_URL,
+      accounts: [process.env.DEPLOYER_PRIVATE_KEY],
+      chainId: 137
+    }
+  },
+  etherscan: {
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_API_KEY,
+      goerli: process.env.ETHERSCAN_API_KEY,
+      bsc: process.env.BSCSCAN_API_KEY,
+      polygon: process.env.POLYGONSCAN_API_KEY
+    }
+  }
+};
+```
 
-                            <!-- Switch Button -->
-                            <div class="flex justify-center -my-3 relative z-10">
-                                <button onclick="app.switchTokens()"
-                                    class="bg-gradient-to-br from-purple-600 to-pink-600 p-3 rounded-2xl hover:scale-110 border-4 border-slate-900 transition-all">
-                                    ↕️
-                                </button>
-                            </div>
+---
 
-                            <!-- To Token -->
-                            <div class="mb-6">
-                                <label class="text-sm text-gray-400 mb-3 block font-semibold">You Receive</label>
-                                <div class="bg-slate-800/50 rounded-2xl p-6 border-2 border-slate-700 hover:border-pink-500/50 transition-all">
-                                    <div class="flex justify-between items-center">
-                                        <input type="number" 
-                                            value="${this.state.toAmount}"
-                                            readonly
-                                            placeholder="0.00"
-                                            class="flex-1 bg-transparent text-white text-4xl outline-none font-bold">
-                                        <div class="flex items-center gap-3 bg-slate-700 px-4 py-3 rounded-xl">
-                                            <span class="text-3xl">${this.state.toToken.logo}</span>
-                                            <div class="text-white font-bold">${this.state.toToken.symbol}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+## 🚀 Deployment Steps
 
-                            <!-- Swap Button -->
-                            <button onclick="app.executeSwap()"
-                                ${!this.state.walletConnected || !this.state.fromAmount ? 'disabled' : ''}
-                                class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-5 rounded-2xl font-black text-xl hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xl transition-all">
-                                ${!this.state.walletConnected ? '🔐 Connect Wallet' : !this.state.fromAmount ? '💎 Enter Amount' : '⚡ Swap Now'}
-                            </button>
+### Step 1: Deploy on Testnet First
 
-                            <!-- Security Badges -->
-                            <div class="mt-6 flex items-center justify-center gap-6 text-xs">
-                                <div class="flex items-center gap-2 text-green-400">
-                                    <span>🛡️</span>
-                                    <span>Audited</span>
-                                </div>
-                                <div class="flex items-center gap-2 text-blue-400">
-                                    <span>🔒</span>
-                                    <span>Non-Custodial</span>
-                                </div>
-                                <div class="flex items-center gap-2 text-purple-400">
-                                    <span>✓</span>
-                                    <span>0.001% Fee</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            },
+Create `scripts/deploy.js`:
+```javascript
+const hre = require("hardhat");
+const { ethers } = require("hardhat");
 
-            renderJercat() {
-                return `
-                    <div class="max-w-4xl mx-auto">
-                        <!-- JERCAT Token Info -->
-                        <div class="bg-gradient-to-br from-yellow-900/30 to-orange-900/30 backdrop-blur-xl rounded-3xl p-8 border-2 border-yellow-500/50 mb-6">
-                            <div class="flex items-center gap-6 mb-6">
-                                <div class="w-24 h-24 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center text-5xl animate-pulse">
-                                    🐱
-                                </div>
-                                <div>
-                                    <h2 class="text-4xl font-black text-white mb-2">$JERCAT Token</h2>
-                                    <p class="text-yellow-400 text-lg font-semibold">Pay ZERO Gas Fees Forever!</p>
-                                </div>
-                            </div>
+async function main() {
+  console.log("🚀 Starting JERCAT deployment...\n");
 
-                            <!-- Token Stats -->
-                            <div class="grid grid-cols-3 gap-4 mb-6">
-                                <div class="bg-slate-800/50 rounded-xl p-4 text-center">
-                                    <div class="text-sm text-gray-400 mb-1">Price</div>
-                                    <div class="text-2xl font-bold text-white">$${this.state.jercatPrice}</div>
-                                </div>
-                                <div class="bg-slate-800/50 rounded-xl p-4 text-center">
-                                    <div class="text-sm text-gray-400 mb-1">Your Balance</div>
-                                    <div class="text-2xl font-bold text-yellow-400">${this.state.jercatBalance}</div>
-                                </div>
-                                <div class="bg-slate-800/50 rounded-xl p-4 text-center">
-                                    <div class="text-sm text-gray-400 mb-1">24h Change</div>
-                                    <div class="text-2xl font-bold text-green-400">+25%</div>
-                                </div>
-                            </div>
+  // Get deployer account
+  const [deployer] = await ethers.getSigners();
+  console.log("Deploying contracts with account:", deployer.address);
+  console.log("Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH\n");
 
-                            <!-- Quick Buy Buttons -->
-                            <div class="grid grid-cols-4 gap-3 mb-6">
-                                ${[10, 50, 100, 500].map(amount => `
-                                    <button onclick="app.buyJercat(${amount})"
-                                        class="bg-gradient-to-r from-yellow-500 to-orange-500 text-black py-3 rounded-xl font-bold hover:scale-105 transition-all">
-                                        Buy $${amount}
-                                    </button>
-                                `).join('')}
-                            </div>
+  // 1. Deploy JERCAT Token
+  console.log("📝 Deploying JercatToken...");
+  const JercatToken = await ethers.getContractFactory("JercatToken");
+  const jercatToken = await JercatToken.deploy();
+  await jercatToken.waitForDeployment();
+  const tokenAddress = await jercatToken.getAddress();
+  console.log("✅ JercatToken deployed to:", tokenAddress);
 
-                            <!-- Benefits -->
-                            <div class="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl p-4">
-                                <div class="text-white font-bold mb-3">🎁 Token Benefits:</div>
-                                <div class="grid grid-cols-2 gap-3 text-sm">
-                                    <div class="flex items-center gap-2 text-green-400">
-                                        <span>✓</span>
-                                        <span>FREE gas fees with JERCAT</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 text-blue-400">
-                                        <span>✓</span>
-                                        <span>50% discount on trading fees</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 text-purple-400">
-                                        <span>✓</span>
-                                        <span>30% revenue share staking</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 text-yellow-400">
-                                        <span>✓</span>
-                                        <span>VIP access to new features</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            },
+  // 2. Deploy DEX Router
+  console.log("\n📝 Deploying JercatDEXRouter...");
+  const feeRecipient = process.env.FEE_RECIPIENT_ADDRESS || deployer.address;
+  const JercatDEXRouter = await ethers.getContractFactory("JercatDEXRouter");
+  const dexRouter = await JercatDEXRouter.deploy(tokenAddress, feeRecipient);
+  await dexRouter.waitForDeployment();
+  const routerAddress = await dexRouter.getAddress();
+  console.log("✅ JercatDEXRouter deployed to:", routerAddress);
 
-            renderBot() {
-                return `
-                    <div class="max-w-4xl mx-auto">
-                        <!-- Bot Status -->
-                        <div class="bg-slate-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/20 mb-6">
-                            <div class="flex items-center justify-between mb-6">
-                                <div>
-                                    <h2 class="text-3xl font-black text-white mb-2">🤖 AI Trading Bot</h2>
-                                    <p class="text-gray-400">Automated 24/7 Trading System</p>
-                                </div>
-                                <div class="flex items-center gap-4">
-                                    <div class="${this.state.botStatus === 'running' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'} px-6 py-3 rounded-xl font-bold border">
-                                        <div class="flex items-center gap-2">
-                                            <div class="w-3 h-3 rounded-full ${this.state.botStatus === 'running' ? 'bg-green-400 animate-pulse' : 'bg-red-400'}"></div>
-                                            ${this.state.botStatus.toUpperCase()}
-                                        </div>
-                                    </div>
-                                    <button onclick="app.toggleBot()"
-                                        class="${this.state.botStatus === 'running' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white px-8 py-3 rounded-xl font-bold transition-all">
-                                        ${this.state.botStatus === 'running' ? '⏸️ Stop Bot' : '▶️ Start Bot'}
-                                    </button>
-                                </div>
-                            </div>
+  // 3. Deploy Token Sale
+  console.log("\n📝 Deploying JercatTokenSale...");
+  const tokenPrice = ethers.parseEther("0.00005"); // 0.00005 ETH per JERCAT ($0.15 if ETH = $3000)
+  const saleEndTime = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30 days from now
+  
+  const JercatTokenSale = await ethers.getContractFactory("JercatTokenSale");
+  const tokenSale = await JercatTokenSale.deploy(tokenAddress, tokenPrice, saleEndTime);
+  await tokenSale.waitForDeployment();
+  const saleAddress = await tokenSale.getAddress();
+  console.log("✅ JercatTokenSale deployed to:", saleAddress);
 
-                            <!-- Bot Stats -->
-                            <div class="grid grid-cols-3 gap-4">
-                                <div class="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-6 border border-purple-500/30">
-                                    <div class="text-gray-400 text-sm mb-2">Total Trades</div>
-                                    <div class="text-4xl font-black text-white">${this.state.botStats.totalTrades}</div>
-                                </div>
-                                <div class="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-6 border border-green-500/30">
-                                    <div class="text-gray-400 text-sm mb-2">Total Profit</div>
-                                    <div class="text-4xl font-black text-green-400">$${this.state.botStats.totalProfit.toFixed(2)}</div>
-                                </div>
-                                <div class="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl p-6 border border-blue-500/30">
-                                    <div class="text-gray-400 text-sm mb-2">Win Rate</div>
-                                    <div class="text-4xl font-black text-blue-400">${this.state.botStats.winRate}%</div>
-                                </div>
-                            </div>
-                        </div>
+  // 4. Transfer tokens to sale contract
+  console.log("\n📝 Transferring tokens to sale contract...");
+  const saleAllocation = ethers.parseEther("10000000"); // 10M tokens for sale
+  await jercatToken.transfer(saleAddress, saleAllocation);
+  console.log("✅ Transferred", ethers.formatEther(saleAllocation), "JERCAT to sale contract");
 
-                        <!-- Bot Configuration -->
-                        <div class="bg-slate-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/20">
-                            <h3 class="text-2xl font-bold text-white mb-6">⚙️ Bot Configuration</h3>
-                            <div class="grid grid-cols-2 gap-6">
-                                <div>
-                                    <label class="text-sm text-gray-400 mb-2 block">Buy Dip Percentage</label>
-                                    <div class="flex items-center gap-3">
-                                        <input type="range" min="1" max="20" value="${this.state.botConfig.buyDipPercentage}"
-                                            oninput="app.state.botConfig.buyDipPercentage = parseInt(this.value); app.render();"
-                                            class="flex-1">
-                                        <span class="text-white font-bold w-16 text-right">${this.state.botConfig.buyDipPercentage}%</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="text-sm text-gray-400 mb-2 block">Take Profit Percentage</label>
-                                    <div class="flex items-center gap-3">
-                                        <input type="range" min="1" max="50" value="${this.state.botConfig.takeProfitPercentage}"
-                                            oninput="app.state.botConfig.takeProfitPercentage = parseInt(this.value); app.render();"
-                                            class="flex-1">
-                                        <span class="text-white font-bold w-16 text-right">${this.state.botConfig.takeProfitPercentage}%</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="text-sm text-gray-400 mb-2 block">Stop Loss Percentage</label>
-                                    <div class="flex items-center gap-3">
-                                        <input type="range" min="1" max="20" value="${this.state.botConfig.stopLossPercentage}"
-                                            oninput="app.state.botConfig.stopLossPercentage = parseInt(this.value); app.render();"
-                                            class="flex-1">
-                                        <span class="text-white font-bold w-16 text-right">${this.state.botConfig.stopLossPercentage}%</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="text-sm text-gray-400 mb-2 block">Buy Amount (ETH)</label>
-                                    <input type="number" step="0.01" value="${this.state.botConfig.buyAmountETH}"
-                                        oninput="app.state.botConfig.buyAmountETH = parseFloat(this.value); app.render();"
-                                        class="w-full bg-slate-800 text-white px-4 py-3 rounded-lg outline-none">
-                                </div>
-                            </div>
+  // 5. Setup DEX Router - Add Uniswap V3 Router
+  console.log("\n📝 Setting up DEX Router...");
+  const UNISWAP_V3_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564"; // Ethereum Mainnet
+  await dexRouter.addRouter(UNISWAP_V3_ROUTER);
+  console.log("✅ Added Uniswap V3 Router:", UNISWAP_V3_ROUTER);
 
-                            <!-- DCA Toggle -->
-                            <div class="mt-6 flex items-center justify-between bg-slate-800 p-4 rounded-lg">
-                                <div>
-                                    <div class="text-white font-semibold">DCA Strategy</div>
-                                    <div class="text-sm text-gray-400">Dollar Cost Averaging enabled</div>
-                                </div>
-                                <button onclick="app.state.botConfig.dcaEnabled = !app.state.botConfig.dcaEnabled; app.render();"
-                                    class="w-16 h-8 rounded-full transition-all ${this.state.botConfig.dcaEnabled ? 'bg-green-500' : 'bg-gray-600'}">
-                                    <div class="w-6 h-6 bg-white rounded-full transition-all ${this.state.botConfig.dcaEnabled ? 'ml-9' : 'ml-1'}"></div>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            },
+  // Summary
+  console.log("\n" + "=".repeat(60));
+  console.log("🎉 DEPLOYMENT COMPLETE!");
+  console.log("=".repeat(60));
+  console.log("\n📋 Contract Addresses:");
+  console.log("JERCAT Token:      ", tokenAddress);
+  console.log("DEX Router:        ", routerAddress);
+  console.log("Token Sale:        ", saleAddress);
+  console.log("Fee Recipient:     ", feeRecipient);
+  console.log("\n💰 Token Distribution:");
+  console.log("Total Supply:       50,000,000 JERCAT");
+  console.log("Sale Allocation:    10,000,000 JERCAT");
+  console.log("Team/Treasury:      40,000,000 JERCAT");
+  console.log("\n⏰ Sale Info:");
+  console.log("Token Price:       ", ethers.formatEther(tokenPrice), "ETH");
+  console.log("Sale Ends:         ", new Date(saleEndTime * 1000).toLocaleString());
+  console.log("\n🔗 Next Steps:");
+  console.log("1. Verify contracts on Etherscan");
+  console.log("2. Add liquidity on Uniswap");
+  console.log("3. Update frontend with contract addresses");
+  console.log("4. Start marketing campaign");
+  console.log("=".repeat(60) + "\n");
 
-            init() {
-                this.render();
-                
-                // Simulate price updates
-                setInterval(() => {
-                    this.state.jercatPrice += (Math.random() - 0.5) * 0.002;
-                    if (document.getElementById('app').innerHTML) {
-                        this.render();
-                    }
-                }, 10000);
-            }
-        };
+  // Save addresses to file
+  const fs = require('fs');
+  const addresses = {
+    network: hre.network.name,
+    jercatToken: tokenAddress,
+    dexRouter: routerAddress,
+    tokenSale: saleAddress,
+    feeRecipient: feeRecipient,
+    deployedAt: new Date().toISOString()
+  };
+  fs.writeFileSync(
+    `deployments/${hre.network.name}.json`,
+    JSON.stringify(addresses, null, 2)
+  );
+  console.log(`📁 Addresses saved to deployments/${hre.network.name}.json`);
+}
 
-        // Initialize app
-        const app = App;
-        app.init();
-    </script>
-</body>
-</html>
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+```
+
+### Step 2: Deploy to Testnet
+```bash
+# Create deployments directory
+mkdir deployments
+
+# Deploy to Goerli
+npx hardhat run scripts/deploy.js --network goerli
+
+# Save the output addresses!
+```
+
+### Step 3: Verify Contracts
+```bash
+# Verify JERCAT Token
+npx hardhat verify --network goerli JERCAT_TOKEN_ADDRESS
+
+# Verify DEX Router
+npx hardhat verify --network goerli DEX_ROUTER_ADDRESS "JERCAT_TOKEN_ADDRESS" "FEE_RECIPIENT_ADDRESS"
+
+# Verify Token Sale
+npx hardhat verify --network goerli SALE_ADDRESS "JERCAT_TOKEN_ADDRESS" "TOKEN_PRICE" "SALE_END_TIME"
+```
+
+---
+
+## ✅ Verification on Etherscan
+
+### Automatic Verification
+```bash
+npx hardhat verify --network mainnet JERCAT_TOKEN_ADDRESS
+```
+
+### Manual Verification
+1. Go to Etherscan.io
+2. Find your contract
+3. Click "Verify and Publish"
+4. Select "Solidity (Single file)"
+5. Paste flattened source code
+6. Enter constructor arguments
+
+### Flatten Contract
+```bash
+npx hardhat flatten contracts/JercatToken.sol > JercatToken_flat.sol
+```
+
+---
+
+## 🔗 Integration with DEX
+
+### Step 1: Add Liquidity on Uniswap
+```javascript
+// Add liquidity script
+async function addLiquidity() {
+  const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+  const JERCAT = "YOUR_JERCAT_ADDRESS";
+  
+  const uniswapFactory = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
+  const positionManager = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
+  
+  // Create pool
+  // Initial price: 1 ETH = 20,000 JERCAT
+  // Provide 10 ETH + 200,000 JERCAT
+}
+```
+
+### Step 2: Add to CoinGecko/CoinMarketCap
+Submit your token:
+- **CoinGecko**: https://www.coingecko.com/en/coins/new
+- **CoinMarketCap**: https://coinmarketcap.com/request/
+
+Required info:
+- Contract address
+- Token symbol: JERCAT
+- Decimals: 18
+- Total supply: 100M
+- Logo (512x512px)
+- Website URL
+- Social media links
+
+---
+
+## 🧪 Testing
+
+Create `test/JercatToken.test.js`:
+```javascript
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
+
+describe("JercatToken", function () {
+  let jercatToken;
+  let owner, addr1, addr2;
+
+  beforeEach(async function () {
+    [owner, addr1, addr2] = await ethers.getSigners();
+    
+    const JercatToken = await ethers.getContractFactory("JercatToken");
+    jercatToken = await JercatToken.deploy();
+    await jercatToken.waitForDeployment();
+  });
+
+  describe("Deployment", function () {
+    it("Should set the right owner", async function () {
+      expect(await jercatToken.owner()).to.equal(owner.address);
+    });
+
+    it("Should assign the initial supply to the owner", async function () {
+      const ownerBalance = await jercatToken.balanceOf(owner.address);
+      expect(await jercatToken.totalSupply()).to.equal(ownerBalance);
+    });
+  });
+
+  describe("Tier System", function () {
+    it("Should give correct tier for Bronze", async function () {
+      const bronzeAmount = ethers.parseEther("100");
+      await jercatToken.transfer(addr1.address, bronzeAmount);
+      
+      const [tier, discount] = await jercatToken.getUserTier(addr1.address);
+      expect(tier).to.equal("BRONZE");
+      expect(discount).to.equal(1000); // 10%
+    });
+
+    it("Should give correct tier for Diamond", async function () {
+      const diamondAmount = ethers.parseEther("10000");
+      await jercatToken.transfer(addr1.address, diamondAmount);
+      
+      const [tier, discount] = await jercatToken.getUserTier(addr1.address);
+      expect(tier).to.equal("DIAMOND");
+      expect(discount).to.equal(10000); // 100%
+    });
+  });
+
+  describe("Staking", function () {
+    it("Should allow staking", async function () {
+      const stakeAmount = ethers.parseEther("1000");
+      await jercatToken.transfer(addr1.address, stakeAmount);
+      
+      await jercatToken.connect(addr1).stake(stakeAmount);
+      
+      expect(await jercatToken.stakedBalance(addr1.address)).to.equal(stakeAmount);
+      expect(await jercatToken.totalStaked()).to.equal(stakeAmount);
+    });
+
+    it("Should calculate rewards correctly", async function () {
+      const stakeAmount = ethers.parseEther("1000");
+      await jercatToken.transfer(addr1.address, stakeAmount);
+      await jercatToken.connect(addr1).stake(stakeAmount);
+      
+      // Fast forward 1 year
+      await ethers.provider.send("evm_increaseTime", [365 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine");
+      
+      const pending = await jercatToken.calculatePendingRewards(addr1.address);
+      
+      // Should be approximately 30% of staked amount (30% APY)
+      const expected = stakeAmount * BigInt(30) / BigInt(100);
+      expect(pending).to.be.closeTo(expected, ethers.parseEther("10"));
+    });
+  });
+});
+```
+
+Run tests:
+```bash
+npx hardhat test
+```
+
+---
+
+## 🛡️ Security Checklist
+
+### Before Mainnet Deployment
+
+- [ ] **Audit by Professional Firm** (CertiK, OpenZeppelin, Trail of Bits)
+- [ ] **All tests passing** (100% coverage)
+- [ ] **Testnet deployment successful**
+- [ ] **Multi-sig wallet setup** for owner functions
+- [ ] **Emergency pause tested**
+- [ ] **Gas optimization verified**
+- [ ] **Slither static analysis** run
+- [ ] **No hardcoded addresses**
+- [ ] **ReentrancyGuard on all external functions**
+- [ ] **Access control properly configured**
+- [ ] **Events emitted for all state changes**
+
+### Slither Analysis
+```bash
+# Install Slither
+pip3 install slither-analyzer
+
+# Run analysis
+slither contracts/JercatToken.sol
+```
+
+### Common Vulnerabilities Checked
+✅ Reentrancy attacks
+✅ Integer overflow/underflow
+✅ Front-running
+✅ Access control
+✅ Gas limit issues
+✅ Denial of service
+✅ Logic errors
+
+---
+
+## 📊 Post-Deployment
+
+### 1. Add to MetaMask
+Users can add JERCAT to MetaMask:
+```javascript
+await ethereum.request({
+  method: 'wallet_watchAsset',
+  params: {
+    type: 'ERC20',
+    options: {
+      address: 'JERCAT_TOKEN_ADDRESS',
+      symbol: 'JERCAT',
+      decimals: 18,
+      image: 'https://your-domain.com/jercat-logo.png'
+    }
+  }
+});
+```
+
+### 2. Create Liquidity Pool
+Provide initial liquidity on Uniswap V3:
+- 10 ETH + 200,000 JERCAT
+- Fee tier: 0.3%
+- Price range: Strategic
+
+### 3. Marketing Campaign
+- Announce on Twitter/X
+- Post on Reddit (r/CryptoMoonShots)
+- Submit to CoinGecko
+- Submit to CoinMarketCap
+- Create Telegram/Discord community
+
+### 4. Monitoring
+Setup alerts for:
+- Large transactions
+- Unusual trading activity
+- Contract interactions
+- Gas price spikes
+
+---
+
+## 💰 Cost Estimates
+
+### Deployment Costs (Ethereum Mainnet)
+- **JercatToken**: ~$150-300 (depending on gas)
+- **DEX Router**: ~$100-200
+- **Token Sale**: ~$80-150
+- **Total**: ~$330-650
+
+### Cheaper Alternatives
+- **Polygon**: ~$0.50 total
+- **BSC**: ~$5 total
+- **Arbitrum**: ~$10 total
+
+---
+
+## 🎯 Next Steps After Deployment
+
+1. ✅ Verify all contracts on Etherscan
+2. ✅ Add liquidity on Uniswap/PancakeSwap
+3. ✅ Submit to token listing sites
+4. ✅ Update frontend with addresses
+5. ✅ Launch marketing campaign
+6. ✅ Setup monitoring & alerts
+7. ✅ Prepare for CEX listings (Binance, Coinbase)
+
+---
+
+## 📞 Support & Resources
+
+- **Hardhat Docs**: https://hardhat.org/docs
+- **OpenZeppelin**: https://docs.openzeppelin.com
+- **Etherscan**: https://etherscan.io
+- **Uniswap Docs**: https://docs.uniswap.org
+
+---
+
+## ⚠️ Disclaimer
+
+This guide is for educational purposes. Always:
+- Audit your contracts professionally
+- Test extensively on testnets
+- Use multi-sig wallets for admin functions
+- Follow legal compliance in your jurisdiction
+- Never expose private keys
+
+---
+
+**Made with 💜 by the JERCAT Team**
