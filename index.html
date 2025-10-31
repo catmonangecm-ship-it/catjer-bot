@@ -1,0 +1,594 @@
+// ========================================
+// JERCAT TRADING BOT - REST API SERVER
+// ========================================
+// Control your trading bot from anywhere with secure REST API
+// Features:
+// - Start/Stop/Pause bot remotely
+// - Get real-time stats and trades
+// - Update configuration on the fly
+// - Secure JWT authentication
+// - WebSocket for live updates
+// - API rate limiting
+// ========================================
+
+const express = require('express');
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const WebSocket = require('ws');
+const http = require('http');
+require('dotenv').config();
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// ========================================
+// CONFIGURATION
+// ========================================
+const PORT = process.env.API_PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this';
+const API_KEY = process.env.API_KEY || 'jercat-api-key-2025';
+
+// ========================================
+// MIDDLEWARE
+// ========================================
+app.use(helmet()); // Security headers
+app.use(cors()); // CORS enabled
+app.use(express.json()); // JSON body parser
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Max 100 requests per window
+  message: 'Too many requests, please try again later'
+});
+app.use('/api/', limiter);
+
+// ========================================
+// SIMULATED BOT STATE (In production, connect to real bot)
+// ========================================
+let botState = {
+  status: 'running', // running, paused, stopped
+  stats: {
+    currentPrice: 0.152,
+    priceChange24h: 8.5,
+    totalTrades: 156,
+    winRate: 62.8,
+    totalProfit: 1234.56,
+    jercatBalance: 5000,
+    ethBalance: 2.5
+  },
+  config: {
+    buyDipPercentage: 5,
+    takeProfitPercentage: 10,
+    stopLossPercentage: 5,
+    buyAmountETH: 0.1,
+    maxBuyPerDay: 10,
+    dcaEnabled: true,
+    dcaIntervalHours: 24,
+    rsiEnabled: true,
+    rsiOversold: 30,
+    rsiOverbought: 70
+  },
+  trades: [],
+  wallets: [
+    { id: 1, address: '0x1234...5678', balance: 2.5, active: true, profit: 450 }
+  ],
+  logs: []
+};
+
+// ========================================
+// AUTHENTICATION MIDDLEWARE
+// ========================================
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// API Key authentication (simpler alternative)
+const authenticateApiKey = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  
+  if (apiKey !== API_KEY) {
+    return res.status(401).json({ error: 'Invalid API key' });
+  }
+  
+  next();
+};
+
+// ========================================
+// WEBSOCKET - REAL-TIME UPDATES
+// ========================================
+wss.on('connection', (ws) => {
+  console.log('🔌 New WebSocket connection');
+  
+  // Send initial data
+  ws.send(JSON.stringify({
+    type: 'initial',
+    data: botState
+  }));
+  
+  // Handle messages from client
+  ws.on('message', (message) => {
+    console.log('📨 Received:', message.toString());
+  });
+  
+  ws.on('close', () => {
+    console.log('🔌 WebSocket disconnected');
+  });
+});
+
+// Broadcast function
+const broadcast = (type, data) => {
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ type, data }));
+    }
+  });
+};
+
+// ========================================
+// API ROUTES
+// ========================================
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ========================================
+// AUTH ROUTES
+// ========================================
+
+// Login (get JWT token)
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  
+  // Simple auth (in production, use database)
+  if (username === 'admin' && password === 'jercat2025') {
+    const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' });
+    
+    res.json({
+      success: true,
+      token,
+      expiresIn: '24h'
+    });
+  } else {
+    res.status(401).json({ error: 'Invalid credentials' });
+  }
+});
+
+// ========================================
+// BOT CONTROL ROUTES
+// ========================================
+
+// Get bot status
+app.get('/api/bot/status', authenticateApiKey, (req, res) => {
+  res.json({
+    status: botState.status,
+    uptime: process.uptime(),
+    lastUpdate: new Date().toISOString()
+  });
+});
+
+// Start bot
+app.post('/api/bot/start', authenticateApiKey, (req, res) => {
+  botState.status = 'running';
+  botState.logs.push({
+    timestamp: new Date().toISOString(),
+    type: 'info',
+    message: 'Bot started via API'
+  });
+  
+  broadcast('status', { status: 'running' });
+  
+  res.json({
+    success: true,
+    status: 'running',
+    message: 'Bot started successfully'
+  });
+});
+
+// Pause bot
+app.post('/api/bot/pause', authenticateApiKey, (req, res) => {
+  botState.status = 'paused';
+  botState.logs.push({
+    timestamp: new Date().toISOString(),
+    type: 'warning',
+    message: 'Bot paused via API'
+  });
+  
+  broadcast('status', { status: 'paused' });
+  
+  res.json({
+    success: true,
+    status: 'paused',
+    message: 'Bot paused successfully'
+  });
+});
+
+// Stop bot
+app.post('/api/bot/stop', authenticateApiKey, (req, res) => {
+  botState.status = 'stopped';
+  botState.logs.push({
+    timestamp: new Date().toISOString(),
+    type: 'error',
+    message: 'Bot stopped via API'
+  });
+  
+  broadcast('status', { status: 'stopped' });
+  
+  res.json({
+    success: true,
+    status: 'stopped',
+    message: 'Bot stopped successfully'
+  });
+});
+
+// ========================================
+// STATS ROUTES
+// ========================================
+
+// Get all stats
+app.get('/api/stats', authenticateApiKey, (req, res) => {
+  res.json({
+    success: true,
+    data: botState.stats
+  });
+});
+
+// Get specific stat
+app.get('/api/stats/:stat', authenticateApiKey, (req, res) => {
+  const { stat } = req.params;
+  
+  if (botState.stats[stat] !== undefined) {
+    res.json({
+      success: true,
+      stat: stat,
+      value: botState.stats[stat]
+    });
+  } else {
+    res.status(404).json({ error: 'Stat not found' });
+  }
+});
+
+// ========================================
+// TRADES ROUTES
+// ========================================
+
+// Get all trades
+app.get('/api/trades', authenticateApiKey, (req, res) => {
+  const { limit = 50, offset = 0 } = req.query;
+  
+  const trades = botState.trades.slice(
+    parseInt(offset), 
+    parseInt(offset) + parseInt(limit)
+  );
+  
+  res.json({
+    success: true,
+    total: botState.trades.length,
+    limit: parseInt(limit),
+    offset: parseInt(offset),
+    data: trades
+  });
+});
+
+// Execute manual trade
+app.post('/api/trades/execute', authenticateApiKey, (req, res) => {
+  const { type, amount } = req.body;
+  
+  if (!['buy', 'sell'].includes(type)) {
+    return res.status(400).json({ error: 'Invalid trade type. Use "buy" or "sell"' });
+  }
+  
+  const trade = {
+    id: Date.now(),
+    type,
+    amount: amount || botState.config.buyAmountETH,
+    price: botState.stats.currentPrice,
+    timestamp: new Date().toISOString(),
+    status: 'completed',
+    profit: type === 'sell' ? (Math.random() * 20 - 5).toFixed(2) : null
+  };
+  
+  botState.trades.unshift(trade);
+  botState.stats.totalTrades++;
+  
+  botState.logs.push({
+    timestamp: new Date().toISOString(),
+    type: 'success',
+    message: `${type.toUpperCase()} executed via API: ${trade.amount} ETH`
+  });
+  
+  broadcast('trade', trade);
+  
+  res.json({
+    success: true,
+    message: `${type} order executed`,
+    trade
+  });
+});
+
+// ========================================
+// CONFIG ROUTES
+// ========================================
+
+// Get configuration
+app.get('/api/config', authenticateApiKey, (req, res) => {
+  res.json({
+    success: true,
+    data: botState.config
+  });
+});
+
+// Update configuration
+app.put('/api/config', authenticateApiKey, (req, res) => {
+  const updates = req.body;
+  
+  // Validate and update config
+  Object.keys(updates).forEach(key => {
+    if (botState.config[key] !== undefined) {
+      botState.config[key] = updates[key];
+    }
+  });
+  
+  botState.logs.push({
+    timestamp: new Date().toISOString(),
+    type: 'info',
+    message: 'Configuration updated via API'
+  });
+  
+  broadcast('config', botState.config);
+  
+  res.json({
+    success: true,
+    message: 'Configuration updated',
+    data: botState.config
+  });
+});
+
+// Update specific config value
+app.patch('/api/config/:key', authenticateApiKey, (req, res) => {
+  const { key } = req.params;
+  const { value } = req.body;
+  
+  if (botState.config[key] !== undefined) {
+    botState.config[key] = value;
+    
+    broadcast('config', botState.config);
+    
+    res.json({
+      success: true,
+      message: `${key} updated`,
+      key,
+      value
+    });
+  } else {
+    res.status(404).json({ error: 'Config key not found' });
+  }
+});
+
+// ========================================
+// WALLETS ROUTES
+// ========================================
+
+// Get all wallets
+app.get('/api/wallets', authenticateApiKey, (req, res) => {
+  res.json({
+    success: true,
+    data: botState.wallets
+  });
+});
+
+// Add wallet
+app.post('/api/wallets', authenticateApiKey, (req, res) => {
+  const { address, privateKey } = req.body;
+  
+  if (!address) {
+    return res.status(400).json({ error: 'Address required' });
+  }
+  
+  const wallet = {
+    id: Date.now(),
+    address,
+    balance: 0,
+    active: false,
+    profit: 0
+  };
+  
+  botState.wallets.push(wallet);
+  
+  res.json({
+    success: true,
+    message: 'Wallet added',
+    wallet
+  });
+});
+
+// Toggle wallet status
+app.patch('/api/wallets/:id/toggle', authenticateApiKey, (req, res) => {
+  const wallet = botState.wallets.find(w => w.id === parseInt(req.params.id));
+  
+  if (!wallet) {
+    return res.status(404).json({ error: 'Wallet not found' });
+  }
+  
+  wallet.active = !wallet.active;
+  
+  res.json({
+    success: true,
+    wallet
+  });
+});
+
+// ========================================
+// LOGS ROUTES
+// ========================================
+
+// Get logs
+app.get('/api/logs', authenticateApiKey, (req, res) => {
+  const { limit = 100, type } = req.query;
+  
+  let logs = botState.logs;
+  
+  if (type) {
+    logs = logs.filter(log => log.type === type);
+  }
+  
+  res.json({
+    success: true,
+    total: logs.length,
+    data: logs.slice(0, parseInt(limit))
+  });
+});
+
+// Clear logs
+app.delete('/api/logs', authenticateApiKey, (req, res) => {
+  botState.logs = [];
+  
+  res.json({
+    success: true,
+    message: 'Logs cleared'
+  });
+});
+
+// ========================================
+// NOTIFICATIONS ROUTES
+// ========================================
+
+// Send notification
+app.post('/api/notify', authenticateApiKey, (req, res) => {
+  const { title, message, type = 'info' } = req.body;
+  
+  broadcast('notification', { title, message, type });
+  
+  res.json({
+    success: true,
+    message: 'Notification sent'
+  });
+});
+
+// ========================================
+// ANALYTICS ROUTES
+// ========================================
+
+// Get analytics summary
+app.get('/api/analytics', authenticateApiKey, (req, res) => {
+  const { period = '24h' } = req.query;
+  
+  const analytics = {
+    period,
+    totalTrades: botState.stats.totalTrades,
+    winRate: botState.stats.winRate,
+    totalProfit: botState.stats.totalProfit,
+    avgProfit: botState.stats.totalProfit / botState.stats.totalTrades || 0,
+    bestTrade: Math.max(...botState.trades.map(t => parseFloat(t.profit || 0))),
+    worstTrade: Math.min(...botState.trades.map(t => parseFloat(t.profit || 0))),
+    currentPrice: botState.stats.currentPrice,
+    priceChange: botState.stats.priceChange24h
+  };
+  
+  res.json({
+    success: true,
+    data: analytics
+  });
+});
+
+// ========================================
+// ERROR HANDLING
+// ========================================
+app.use((err, req, res, next) => {
+  console.error('❌ Error:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: err.message
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Endpoint not found',
+    path: req.path
+  });
+});
+
+// ========================================
+// START SERVER
+// ========================================
+server.listen(PORT, () => {
+  console.log('');
+  console.log('🚀 JERCAT Bot API Server Started!');
+  console.log('================================');
+  console.log(`📡 HTTP API: http://localhost:${PORT}`);
+  console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
+  console.log('');
+  console.log('🔑 Authentication:');
+  console.log('   Header: x-api-key');
+  console.log(`   Value: ${API_KEY}`);
+  console.log('');
+  console.log('📚 API Documentation:');
+  console.log('   GET    /api/bot/status');
+  console.log('   POST   /api/bot/start');
+  console.log('   POST   /api/bot/pause');
+  console.log('   POST   /api/bot/stop');
+  console.log('   GET    /api/stats');
+  console.log('   GET    /api/trades');
+  console.log('   POST   /api/trades/execute');
+  console.log('   GET    /api/config');
+  console.log('   PUT    /api/config');
+  console.log('   GET    /api/wallets');
+  console.log('   POST   /api/wallets');
+  console.log('   GET    /api/logs');
+  console.log('   GET    /api/analytics');
+  console.log('================================');
+  console.log('');
+});
+
+// ========================================
+// GRACEFUL SHUTDOWN
+// ========================================
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down server...');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+// ========================================
+// SIMULATE PRICE UPDATES
+// ========================================
+setInterval(() => {
+  // Update price
+  botState.stats.currentPrice += (Math.random() - 0.5) * 0.002;
+  botState.stats.priceChange24h = ((Math.random() - 0.5) * 20).toFixed(2);
+  
+  // Broadcast update
+  broadcast('price', {
+    price: botState.stats.currentPrice,
+    change: botState.stats.priceChange24h
+  });
+}, 5000);
+
+module.exports = app;
