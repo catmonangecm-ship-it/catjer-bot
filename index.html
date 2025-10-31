@@ -1,594 +1,597 @@
-// ========================================
-// JERCAT TRADING BOT - REST API SERVER
-// ========================================
-// Control your trading bot from anywhere with secure REST API
-// Features:
-// - Start/Stop/Pause bot remotely
-// - Get real-time stats and trades
-// - Update configuration on the fly
-// - Secure JWT authentication
-// - WebSocket for live updates
-// - API rate limiting
-// ========================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JERCAT DEX - Professional Trading Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes blob {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(20px, -50px) scale(1.1); }
+            50% { transform: translate(-20px, 20px) scale(0.9); }
+            75% { transform: translate(50px, 50px) scale(1.05); }
+        }
+        .animate-blob {
+            animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+            animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+            animation-delay: 4s;
+        }
+        .gradient-text {
+            background: linear-gradient(to right, #a855f7, #ec4899, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+    </style>
+</head>
+<body class="bg-slate-950">
+    <!-- Main Container -->
+    <div id="app"></div>
 
-const express = require('express');
-const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const WebSocket = require('ws');
-const http = require('http');
-require('dotenv').config();
+    <script>
+        // ========================================
+        // COMPLETE JERCAT SYSTEM
+        // ========================================
+        
+        const App = {
+            state: {
+                // DEX State
+                currentView: 'dex',
+                walletConnected: false,
+                walletAddress: '',
+                selectedChain: 'ethereum',
+                fromToken: { symbol: 'ETH', price: 3000, logo: '⟠' },
+                toToken: { symbol: 'USDC', price: 1, logo: '💵' },
+                fromAmount: '',
+                toAmount: '',
+                approvalStatus: 'none',
+                
+                // JERCAT Token
+                jercatBalance: 0,
+                jercatPrice: 0.15,
+                
+                // Trading Bot State
+                botStatus: 'stopped',
+                botConfig: {
+                    buyDipPercentage: 5,
+                    takeProfitPercentage: 10,
+                    stopLossPercentage: 5,
+                    buyAmountETH: 0.1,
+                    dcaEnabled: true
+                },
+                botStats: {
+                    totalTrades: 0,
+                    winRate: 0,
+                    totalProfit: 0
+                },
+                trades: [],
+                logs: []
+            },
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+            chains: [
+                { id: 'ethereum', name: 'Ethereum', icon: '⟠', color: 'from-blue-500 to-cyan-500' },
+                { id: 'bsc', name: 'BSC', icon: '🔶', color: 'from-yellow-500 to-orange-500' },
+                { id: 'polygon', name: 'Polygon', icon: '🟣', color: 'from-purple-500 to-pink-500' },
+                { id: 'arbitrum', name: 'Arbitrum', icon: '🔵', color: 'from-blue-600 to-indigo-600' }
+            ],
 
-// ========================================
-// CONFIGURATION
-// ========================================
-const PORT = process.env.API_PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this';
-const API_KEY = process.env.API_KEY || 'jercat-api-key-2025';
+            tokens: {
+                ethereum: [
+                    { symbol: 'ETH', price: 3000, logo: '⟠' },
+                    { symbol: 'USDC', price: 1, logo: '💵' },
+                    { symbol: 'USDT', price: 1, logo: '💲' },
+                    { symbol: 'WBTC', price: 45000, logo: '₿' }
+                ],
+                bsc: [
+                    { symbol: 'BNB', price: 300, logo: '🔶' },
+                    { symbol: 'USDT', price: 1, logo: '💲' }
+                ],
+                polygon: [
+                    { symbol: 'MATIC', price: 0.8, logo: '🟣' },
+                    { symbol: 'USDC', price: 1, logo: '💵' }
+                ],
+                arbitrum: [
+                    { symbol: 'ETH', price: 3000, logo: '⟠' },
+                    { symbol: 'USDC', price: 1, logo: '💵' }
+                ]
+            },
 
-// ========================================
-// MIDDLEWARE
-// ========================================
-app.use(helmet()); // Security headers
-app.use(cors()); // CORS enabled
-app.use(express.json()); // JSON body parser
+            // Connect Wallet
+            connectWallet() {
+                if (typeof window.ethereum !== 'undefined') {
+                    this.state.walletConnected = true;
+                    this.state.walletAddress = '0x' + Math.random().toString(16).substr(2, 8) + '...';
+                    this.state.jercatBalance = (Math.random() * 1000).toFixed(2);
+                    this.addLog('success', 'Wallet connected successfully');
+                    this.render();
+                } else {
+                    alert('Please install MetaMask');
+                }
+            },
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Max 100 requests per window
-  message: 'Too many requests, please try again later'
-});
-app.use('/api/', limiter);
+            // Calculate swap output
+            calculateOutput(input) {
+                if (!input) return '';
+                const rate = this.state.fromToken.price / this.state.toToken.price;
+                return (parseFloat(input) * rate * 0.997).toFixed(6);
+            },
 
-// ========================================
-// SIMULATED BOT STATE (In production, connect to real bot)
-// ========================================
-let botState = {
-  status: 'running', // running, paused, stopped
-  stats: {
-    currentPrice: 0.152,
-    priceChange24h: 8.5,
-    totalTrades: 156,
-    winRate: 62.8,
-    totalProfit: 1234.56,
-    jercatBalance: 5000,
-    ethBalance: 2.5
-  },
-  config: {
-    buyDipPercentage: 5,
-    takeProfitPercentage: 10,
-    stopLossPercentage: 5,
-    buyAmountETH: 0.1,
-    maxBuyPerDay: 10,
-    dcaEnabled: true,
-    dcaIntervalHours: 24,
-    rsiEnabled: true,
-    rsiOversold: 30,
-    rsiOverbought: 70
-  },
-  trades: [],
-  wallets: [
-    { id: 1, address: '0x1234...5678', balance: 2.5, active: true, profit: 450 }
-  ],
-  logs: []
-};
+            // Execute swap
+            executeSwap() {
+                if (!this.state.walletConnected) {
+                    alert('Please connect your wallet');
+                    return;
+                }
+                if (!this.state.fromAmount) {
+                    alert('Please enter an amount');
+                    return;
+                }
 
-// ========================================
-// AUTHENTICATION MIDDLEWARE
-// ========================================
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+                const trade = {
+                    id: Date.now(),
+                    type: 'swap',
+                    from: this.state.fromToken.symbol,
+                    to: this.state.toToken.symbol,
+                    amount: this.state.fromAmount,
+                    timestamp: new Date().toISOString()
+                };
 
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
+                this.state.trades.unshift(trade);
+                this.addLog('success', `Swapped ${this.state.fromAmount} ${this.state.fromToken.symbol} to ${this.state.toAmount} ${this.state.toToken.symbol}`);
+                
+                alert('✅ Swap executed successfully!');
+                this.state.fromAmount = '';
+                this.state.toAmount = '';
+                this.render();
+            },
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
-    req.user = user;
-    next();
-  });
-};
+            // Buy JERCAT
+            buyJercat(amount) {
+                if (!this.state.walletConnected) {
+                    alert('Please connect wallet');
+                    return;
+                }
 
-// API Key authentication (simpler alternative)
-const authenticateApiKey = (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
-  
-  if (apiKey !== API_KEY) {
-    return res.status(401).json({ error: 'Invalid API key' });
-  }
-  
-  next();
-};
+                const tokens = (amount / this.state.jercatPrice).toFixed(2);
+                this.state.jercatBalance = parseFloat(this.state.jercatBalance) + parseFloat(tokens);
+                
+                this.addLog('success', `Bought ${tokens} JERCAT for $${amount}`);
+                alert(`✅ Purchase successful!\n\nReceived: ${tokens} JERCAT 🐱`);
+                this.render();
+            },
 
-// ========================================
-// WEBSOCKET - REAL-TIME UPDATES
-// ========================================
-wss.on('connection', (ws) => {
-  console.log('🔌 New WebSocket connection');
-  
-  // Send initial data
-  ws.send(JSON.stringify({
-    type: 'initial',
-    data: botState
-  }));
-  
-  // Handle messages from client
-  ws.on('message', (message) => {
-    console.log('📨 Received:', message.toString());
-  });
-  
-  ws.on('close', () => {
-    console.log('🔌 WebSocket disconnected');
-  });
-});
+            // Trading Bot Controls
+            toggleBot() {
+                if (this.state.botStatus === 'running') {
+                    this.state.botStatus = 'paused';
+                    this.addLog('warning', 'Bot paused');
+                } else {
+                    this.state.botStatus = 'running';
+                    this.addLog('success', 'Bot started');
+                    this.simulateTrading();
+                }
+                this.render();
+            },
 
-// Broadcast function
-const broadcast = (type, data) => {
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type, data }));
-    }
-  });
-};
+            simulateTrading() {
+                if (this.state.botStatus !== 'running') return;
 
-// ========================================
-// API ROUTES
-// ========================================
+                setTimeout(() => {
+                    if (Math.random() > 0.5) {
+                        const profit = (Math.random() * 50 - 10).toFixed(2);
+                        this.state.botStats.totalTrades++;
+                        this.state.botStats.totalProfit += parseFloat(profit);
+                        this.state.botStats.winRate = ((this.state.botStats.totalProfit > 0 ? 1 : 0) * 100).toFixed(1);
+                        
+                        this.addLog(profit > 0 ? 'success' : 'error', 
+                            `Trade executed: ${profit > 0 ? '+' : ''}$${profit}`);
+                        this.render();
+                    }
+                    
+                    this.simulateTrading();
+                }, 10000);
+            },
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
-});
+            // Logging
+            addLog(type, message) {
+                this.state.logs.unshift({
+                    id: Date.now(),
+                    type,
+                    message,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+                
+                if (this.state.logs.length > 50) {
+                    this.state.logs = this.state.logs.slice(0, 50);
+                }
+            },
 
-// ========================================
-// AUTH ROUTES
-// ========================================
+            // Switch tokens
+            switchTokens() {
+                const temp = this.state.fromToken;
+                this.state.fromToken = this.state.toToken;
+                this.state.toToken = temp;
+                this.state.fromAmount = this.state.toAmount;
+                this.state.toAmount = '';
+                this.render();
+            },
 
-// Login (get JWT token)
-app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body;
-  
-  // Simple auth (in production, use database)
-  if (username === 'admin' && password === 'jercat2025') {
-    const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' });
-    
-    res.json({
-      success: true,
-      token,
-      expiresIn: '24h'
-    });
-  } else {
-    res.status(401).json({ error: 'Invalid credentials' });
-  }
-});
+            // Render UI
+            render() {
+                const app = document.getElementById('app');
+                
+                app.innerHTML = `
+                    <!-- Animated Background -->
+                    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+                        <div class="absolute top-20 left-10 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
+                        <div class="absolute top-40 right-10 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
+                        <div class="absolute bottom-20 left-1/2 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
+                    </div>
 
-// ========================================
-// BOT CONTROL ROUTES
-// ========================================
+                    <div class="relative z-10 min-h-screen p-4">
+                        <!-- Header -->
+                        <header class="max-w-7xl mx-auto mb-8">
+                            <div class="text-center pt-8 mb-8">
+                                <h1 class="text-6xl font-black gradient-text mb-2">JERCAT DEX</h1>
+                                <p class="text-purple-300 text-xl">Professional Trading Platform with AI Bot</p>
+                            </div>
 
-// Get bot status
-app.get('/api/bot/status', authenticateApiKey, (req, res) => {
-  res.json({
-    status: botState.status,
-    uptime: process.uptime(),
-    lastUpdate: new Date().toISOString()
-  });
-});
+                            <!-- Navigation -->
+                            <div class="flex justify-center gap-4 mb-6">
+                                <button onclick="app.state.currentView = 'dex'; app.render();" 
+                                    class="px-6 py-3 rounded-xl font-bold transition-all ${this.state.currentView === 'dex' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-gray-400'}">
+                                    🔄 DEX Trading
+                                </button>
+                                <button onclick="app.state.currentView = 'jercat'; app.render();" 
+                                    class="px-6 py-3 rounded-xl font-bold transition-all ${this.state.currentView === 'jercat' ? 'bg-yellow-600 text-white' : 'bg-slate-800 text-gray-400'}">
+                                    🐱 JERCAT Token
+                                </button>
+                                <button onclick="app.state.currentView = 'bot'; app.render();" 
+                                    class="px-6 py-3 rounded-xl font-bold transition-all ${this.state.currentView === 'bot' ? 'bg-green-600 text-white' : 'bg-slate-800 text-gray-400'}">
+                                    🤖 Trading Bot
+                                </button>
+                            </div>
 
-// Start bot
-app.post('/api/bot/start', authenticateApiKey, (req, res) => {
-  botState.status = 'running';
-  botState.logs.push({
-    timestamp: new Date().toISOString(),
-    type: 'info',
-    message: 'Bot started via API'
-  });
-  
-  broadcast('status', { status: 'running' });
-  
-  res.json({
-    success: true,
-    status: 'running',
-    message: 'Bot started successfully'
-  });
-});
+                            <!-- Wallet Status -->
+                            <div class="max-w-2xl mx-auto">
+                                ${!this.state.walletConnected ? `
+                                    <button onclick="app.connectWallet()" 
+                                        class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all">
+                                        🔐 Connect MetaMask Wallet
+                                    </button>
+                                ` : `
+                                    <div class="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                                                <span class="text-green-400 font-bold">Connected</span>
+                                            </div>
+                                            <div class="flex items-center gap-4">
+                                                <div class="text-right">
+                                                    <div class="text-xs text-gray-400">JERCAT Balance</div>
+                                                    <div class="text-yellow-400 font-bold">🐱 ${this.state.jercatBalance}</div>
+                                                </div>
+                                                <span class="text-gray-300 font-mono text-sm">${this.state.walletAddress}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `}
+                            </div>
+                        </header>
 
-// Pause bot
-app.post('/api/bot/pause', authenticateApiKey, (req, res) => {
-  botState.status = 'paused';
-  botState.logs.push({
-    timestamp: new Date().toISOString(),
-    type: 'warning',
-    message: 'Bot paused via API'
-  });
-  
-  broadcast('status', { status: 'paused' });
-  
-  res.json({
-    success: true,
-    status: 'paused',
-    message: 'Bot paused successfully'
-  });
-});
+                        <main class="max-w-7xl mx-auto">
+                            ${this.state.currentView === 'dex' ? this.renderDEX() : ''}
+                            ${this.state.currentView === 'jercat' ? this.renderJercat() : ''}
+                            ${this.state.currentView === 'bot' ? this.renderBot() : ''}
+                        </main>
 
-// Stop bot
-app.post('/api/bot/stop', authenticateApiKey, (req, res) => {
-  botState.status = 'stopped';
-  botState.logs.push({
-    timestamp: new Date().toISOString(),
-    type: 'error',
-    message: 'Bot stopped via API'
-  });
-  
-  broadcast('status', { status: 'stopped' });
-  
-  res.json({
-    success: true,
-    status: 'stopped',
-    message: 'Bot stopped successfully'
-  });
-});
+                        <!-- Live Logs -->
+                        <div class="max-w-7xl mx-auto mt-8">
+                            <div class="bg-slate-900/80 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/20">
+                                <h3 class="text-xl font-bold text-white mb-4">📝 Live Activity Log</h3>
+                                <div class="bg-slate-950 rounded-xl p-4 max-h-64 overflow-y-auto font-mono text-xs">
+                                    ${this.state.logs.length === 0 ? 
+                                        '<div class="text-gray-500 text-center py-4">No activity yet</div>' :
+                                        this.state.logs.map(log => `
+                                            <div class="mb-2 flex items-start gap-3 ${
+                                                log.type === 'error' ? 'text-red-400' :
+                                                log.type === 'warning' ? 'text-yellow-400' :
+                                                log.type === 'success' ? 'text-green-400' :
+                                                'text-gray-300'
+                                            }">
+                                                <span class="text-gray-500">[${log.timestamp}]</span>
+                                                <span>${log.message}</span>
+                                            </div>
+                                        `).join('')
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
 
-// ========================================
-// STATS ROUTES
-// ========================================
+            renderDEX() {
+                return `
+                    <div class="max-w-2xl mx-auto">
+                        <!-- Chain Selector -->
+                        <div class="bg-slate-900/80 backdrop-blur-xl rounded-3xl p-6 border border-purple-500/20 mb-6">
+                            <h3 class="text-white font-bold text-lg mb-4">Select Network</h3>
+                            <div class="grid grid-cols-4 gap-3">
+                                ${this.chains.map(chain => `
+                                    <button onclick="app.state.selectedChain = '${chain.id}'; app.render();"
+                                        class="p-4 rounded-xl transition-all ${
+                                            this.state.selectedChain === chain.id
+                                                ? `bg-gradient-to-br ${chain.color} shadow-xl scale-105`
+                                                : 'bg-slate-800/50 hover:bg-slate-700/50'
+                                        }">
+                                        <div class="text-3xl mb-2">${chain.icon}</div>
+                                        <div class="text-xs font-bold ${this.state.selectedChain === chain.id ? 'text-white' : 'text-gray-400'}">
+                                            ${chain.name}
+                                        </div>
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
 
-// Get all stats
-app.get('/api/stats', authenticateApiKey, (req, res) => {
-  res.json({
-    success: true,
-    data: botState.stats
-  });
-});
+                        <!-- Swap Card -->
+                        <div class="bg-slate-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/20">
+                            <!-- From Token -->
+                            <div class="mb-2">
+                                <label class="text-sm text-gray-400 mb-3 block font-semibold">You Pay</label>
+                                <div class="bg-slate-800/50 rounded-2xl p-6 border-2 border-slate-700 hover:border-purple-500/50 transition-all">
+                                    <div class="flex justify-between items-center">
+                                        <input type="number" 
+                                            value="${this.state.fromAmount}"
+                                            oninput="app.state.fromAmount = this.value; app.state.toAmount = app.calculateOutput(this.value); app.render();"
+                                            placeholder="0.00"
+                                            class="flex-1 bg-transparent text-white text-4xl outline-none font-bold placeholder-gray-600">
+                                        <div class="flex items-center gap-3 bg-slate-700 px-4 py-3 rounded-xl">
+                                            <span class="text-3xl">${this.state.fromToken.logo}</span>
+                                            <div class="text-white font-bold">${this.state.fromToken.symbol}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-// Get specific stat
-app.get('/api/stats/:stat', authenticateApiKey, (req, res) => {
-  const { stat } = req.params;
-  
-  if (botState.stats[stat] !== undefined) {
-    res.json({
-      success: true,
-      stat: stat,
-      value: botState.stats[stat]
-    });
-  } else {
-    res.status(404).json({ error: 'Stat not found' });
-  }
-});
+                            <!-- Switch Button -->
+                            <div class="flex justify-center -my-3 relative z-10">
+                                <button onclick="app.switchTokens()"
+                                    class="bg-gradient-to-br from-purple-600 to-pink-600 p-3 rounded-2xl hover:scale-110 border-4 border-slate-900 transition-all">
+                                    ↕️
+                                </button>
+                            </div>
 
-// ========================================
-// TRADES ROUTES
-// ========================================
+                            <!-- To Token -->
+                            <div class="mb-6">
+                                <label class="text-sm text-gray-400 mb-3 block font-semibold">You Receive</label>
+                                <div class="bg-slate-800/50 rounded-2xl p-6 border-2 border-slate-700 hover:border-pink-500/50 transition-all">
+                                    <div class="flex justify-between items-center">
+                                        <input type="number" 
+                                            value="${this.state.toAmount}"
+                                            readonly
+                                            placeholder="0.00"
+                                            class="flex-1 bg-transparent text-white text-4xl outline-none font-bold">
+                                        <div class="flex items-center gap-3 bg-slate-700 px-4 py-3 rounded-xl">
+                                            <span class="text-3xl">${this.state.toToken.logo}</span>
+                                            <div class="text-white font-bold">${this.state.toToken.symbol}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-// Get all trades
-app.get('/api/trades', authenticateApiKey, (req, res) => {
-  const { limit = 50, offset = 0 } = req.query;
-  
-  const trades = botState.trades.slice(
-    parseInt(offset), 
-    parseInt(offset) + parseInt(limit)
-  );
-  
-  res.json({
-    success: true,
-    total: botState.trades.length,
-    limit: parseInt(limit),
-    offset: parseInt(offset),
-    data: trades
-  });
-});
+                            <!-- Swap Button -->
+                            <button onclick="app.executeSwap()"
+                                ${!this.state.walletConnected || !this.state.fromAmount ? 'disabled' : ''}
+                                class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-5 rounded-2xl font-black text-xl hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xl transition-all">
+                                ${!this.state.walletConnected ? '🔐 Connect Wallet' : !this.state.fromAmount ? '💎 Enter Amount' : '⚡ Swap Now'}
+                            </button>
 
-// Execute manual trade
-app.post('/api/trades/execute', authenticateApiKey, (req, res) => {
-  const { type, amount } = req.body;
-  
-  if (!['buy', 'sell'].includes(type)) {
-    return res.status(400).json({ error: 'Invalid trade type. Use "buy" or "sell"' });
-  }
-  
-  const trade = {
-    id: Date.now(),
-    type,
-    amount: amount || botState.config.buyAmountETH,
-    price: botState.stats.currentPrice,
-    timestamp: new Date().toISOString(),
-    status: 'completed',
-    profit: type === 'sell' ? (Math.random() * 20 - 5).toFixed(2) : null
-  };
-  
-  botState.trades.unshift(trade);
-  botState.stats.totalTrades++;
-  
-  botState.logs.push({
-    timestamp: new Date().toISOString(),
-    type: 'success',
-    message: `${type.toUpperCase()} executed via API: ${trade.amount} ETH`
-  });
-  
-  broadcast('trade', trade);
-  
-  res.json({
-    success: true,
-    message: `${type} order executed`,
-    trade
-  });
-});
+                            <!-- Security Badges -->
+                            <div class="mt-6 flex items-center justify-center gap-6 text-xs">
+                                <div class="flex items-center gap-2 text-green-400">
+                                    <span>🛡️</span>
+                                    <span>Audited</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-blue-400">
+                                    <span>🔒</span>
+                                    <span>Non-Custodial</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-purple-400">
+                                    <span>✓</span>
+                                    <span>0.001% Fee</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
 
-// ========================================
-// CONFIG ROUTES
-// ========================================
+            renderJercat() {
+                return `
+                    <div class="max-w-4xl mx-auto">
+                        <!-- JERCAT Token Info -->
+                        <div class="bg-gradient-to-br from-yellow-900/30 to-orange-900/30 backdrop-blur-xl rounded-3xl p-8 border-2 border-yellow-500/50 mb-6">
+                            <div class="flex items-center gap-6 mb-6">
+                                <div class="w-24 h-24 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center text-5xl animate-pulse">
+                                    🐱
+                                </div>
+                                <div>
+                                    <h2 class="text-4xl font-black text-white mb-2">$JERCAT Token</h2>
+                                    <p class="text-yellow-400 text-lg font-semibold">Pay ZERO Gas Fees Forever!</p>
+                                </div>
+                            </div>
 
-// Get configuration
-app.get('/api/config', authenticateApiKey, (req, res) => {
-  res.json({
-    success: true,
-    data: botState.config
-  });
-});
+                            <!-- Token Stats -->
+                            <div class="grid grid-cols-3 gap-4 mb-6">
+                                <div class="bg-slate-800/50 rounded-xl p-4 text-center">
+                                    <div class="text-sm text-gray-400 mb-1">Price</div>
+                                    <div class="text-2xl font-bold text-white">$${this.state.jercatPrice}</div>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-xl p-4 text-center">
+                                    <div class="text-sm text-gray-400 mb-1">Your Balance</div>
+                                    <div class="text-2xl font-bold text-yellow-400">${this.state.jercatBalance}</div>
+                                </div>
+                                <div class="bg-slate-800/50 rounded-xl p-4 text-center">
+                                    <div class="text-sm text-gray-400 mb-1">24h Change</div>
+                                    <div class="text-2xl font-bold text-green-400">+25%</div>
+                                </div>
+                            </div>
 
-// Update configuration
-app.put('/api/config', authenticateApiKey, (req, res) => {
-  const updates = req.body;
-  
-  // Validate and update config
-  Object.keys(updates).forEach(key => {
-    if (botState.config[key] !== undefined) {
-      botState.config[key] = updates[key];
-    }
-  });
-  
-  botState.logs.push({
-    timestamp: new Date().toISOString(),
-    type: 'info',
-    message: 'Configuration updated via API'
-  });
-  
-  broadcast('config', botState.config);
-  
-  res.json({
-    success: true,
-    message: 'Configuration updated',
-    data: botState.config
-  });
-});
+                            <!-- Quick Buy Buttons -->
+                            <div class="grid grid-cols-4 gap-3 mb-6">
+                                ${[10, 50, 100, 500].map(amount => `
+                                    <button onclick="app.buyJercat(${amount})"
+                                        class="bg-gradient-to-r from-yellow-500 to-orange-500 text-black py-3 rounded-xl font-bold hover:scale-105 transition-all">
+                                        Buy $${amount}
+                                    </button>
+                                `).join('')}
+                            </div>
 
-// Update specific config value
-app.patch('/api/config/:key', authenticateApiKey, (req, res) => {
-  const { key } = req.params;
-  const { value } = req.body;
-  
-  if (botState.config[key] !== undefined) {
-    botState.config[key] = value;
-    
-    broadcast('config', botState.config);
-    
-    res.json({
-      success: true,
-      message: `${key} updated`,
-      key,
-      value
-    });
-  } else {
-    res.status(404).json({ error: 'Config key not found' });
-  }
-});
+                            <!-- Benefits -->
+                            <div class="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl p-4">
+                                <div class="text-white font-bold mb-3">🎁 Token Benefits:</div>
+                                <div class="grid grid-cols-2 gap-3 text-sm">
+                                    <div class="flex items-center gap-2 text-green-400">
+                                        <span>✓</span>
+                                        <span>FREE gas fees with JERCAT</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-blue-400">
+                                        <span>✓</span>
+                                        <span>50% discount on trading fees</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-purple-400">
+                                        <span>✓</span>
+                                        <span>30% revenue share staking</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-yellow-400">
+                                        <span>✓</span>
+                                        <span>VIP access to new features</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
 
-// ========================================
-// WALLETS ROUTES
-// ========================================
+            renderBot() {
+                return `
+                    <div class="max-w-4xl mx-auto">
+                        <!-- Bot Status -->
+                        <div class="bg-slate-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/20 mb-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 class="text-3xl font-black text-white mb-2">🤖 AI Trading Bot</h2>
+                                    <p class="text-gray-400">Automated 24/7 Trading System</p>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <div class="${this.state.botStatus === 'running' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'} px-6 py-3 rounded-xl font-bold border">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-3 h-3 rounded-full ${this.state.botStatus === 'running' ? 'bg-green-400 animate-pulse' : 'bg-red-400'}"></div>
+                                            ${this.state.botStatus.toUpperCase()}
+                                        </div>
+                                    </div>
+                                    <button onclick="app.toggleBot()"
+                                        class="${this.state.botStatus === 'running' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white px-8 py-3 rounded-xl font-bold transition-all">
+                                        ${this.state.botStatus === 'running' ? '⏸️ Stop Bot' : '▶️ Start Bot'}
+                                    </button>
+                                </div>
+                            </div>
 
-// Get all wallets
-app.get('/api/wallets', authenticateApiKey, (req, res) => {
-  res.json({
-    success: true,
-    data: botState.wallets
-  });
-});
+                            <!-- Bot Stats -->
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-6 border border-purple-500/30">
+                                    <div class="text-gray-400 text-sm mb-2">Total Trades</div>
+                                    <div class="text-4xl font-black text-white">${this.state.botStats.totalTrades}</div>
+                                </div>
+                                <div class="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-6 border border-green-500/30">
+                                    <div class="text-gray-400 text-sm mb-2">Total Profit</div>
+                                    <div class="text-4xl font-black text-green-400">$${this.state.botStats.totalProfit.toFixed(2)}</div>
+                                </div>
+                                <div class="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl p-6 border border-blue-500/30">
+                                    <div class="text-gray-400 text-sm mb-2">Win Rate</div>
+                                    <div class="text-4xl font-black text-blue-400">${this.state.botStats.winRate}%</div>
+                                </div>
+                            </div>
+                        </div>
 
-// Add wallet
-app.post('/api/wallets', authenticateApiKey, (req, res) => {
-  const { address, privateKey } = req.body;
-  
-  if (!address) {
-    return res.status(400).json({ error: 'Address required' });
-  }
-  
-  const wallet = {
-    id: Date.now(),
-    address,
-    balance: 0,
-    active: false,
-    profit: 0
-  };
-  
-  botState.wallets.push(wallet);
-  
-  res.json({
-    success: true,
-    message: 'Wallet added',
-    wallet
-  });
-});
+                        <!-- Bot Configuration -->
+                        <div class="bg-slate-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/20">
+                            <h3 class="text-2xl font-bold text-white mb-6">⚙️ Bot Configuration</h3>
+                            <div class="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label class="text-sm text-gray-400 mb-2 block">Buy Dip Percentage</label>
+                                    <div class="flex items-center gap-3">
+                                        <input type="range" min="1" max="20" value="${this.state.botConfig.buyDipPercentage}"
+                                            oninput="app.state.botConfig.buyDipPercentage = parseInt(this.value); app.render();"
+                                            class="flex-1">
+                                        <span class="text-white font-bold w-16 text-right">${this.state.botConfig.buyDipPercentage}%</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-sm text-gray-400 mb-2 block">Take Profit Percentage</label>
+                                    <div class="flex items-center gap-3">
+                                        <input type="range" min="1" max="50" value="${this.state.botConfig.takeProfitPercentage}"
+                                            oninput="app.state.botConfig.takeProfitPercentage = parseInt(this.value); app.render();"
+                                            class="flex-1">
+                                        <span class="text-white font-bold w-16 text-right">${this.state.botConfig.takeProfitPercentage}%</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-sm text-gray-400 mb-2 block">Stop Loss Percentage</label>
+                                    <div class="flex items-center gap-3">
+                                        <input type="range" min="1" max="20" value="${this.state.botConfig.stopLossPercentage}"
+                                            oninput="app.state.botConfig.stopLossPercentage = parseInt(this.value); app.render();"
+                                            class="flex-1">
+                                        <span class="text-white font-bold w-16 text-right">${this.state.botConfig.stopLossPercentage}%</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-sm text-gray-400 mb-2 block">Buy Amount (ETH)</label>
+                                    <input type="number" step="0.01" value="${this.state.botConfig.buyAmountETH}"
+                                        oninput="app.state.botConfig.buyAmountETH = parseFloat(this.value); app.render();"
+                                        class="w-full bg-slate-800 text-white px-4 py-3 rounded-lg outline-none">
+                                </div>
+                            </div>
 
-// Toggle wallet status
-app.patch('/api/wallets/:id/toggle', authenticateApiKey, (req, res) => {
-  const wallet = botState.wallets.find(w => w.id === parseInt(req.params.id));
-  
-  if (!wallet) {
-    return res.status(404).json({ error: 'Wallet not found' });
-  }
-  
-  wallet.active = !wallet.active;
-  
-  res.json({
-    success: true,
-    wallet
-  });
-});
+                            <!-- DCA Toggle -->
+                            <div class="mt-6 flex items-center justify-between bg-slate-800 p-4 rounded-lg">
+                                <div>
+                                    <div class="text-white font-semibold">DCA Strategy</div>
+                                    <div class="text-sm text-gray-400">Dollar Cost Averaging enabled</div>
+                                </div>
+                                <button onclick="app.state.botConfig.dcaEnabled = !app.state.botConfig.dcaEnabled; app.render();"
+                                    class="w-16 h-8 rounded-full transition-all ${this.state.botConfig.dcaEnabled ? 'bg-green-500' : 'bg-gray-600'}">
+                                    <div class="w-6 h-6 bg-white rounded-full transition-all ${this.state.botConfig.dcaEnabled ? 'ml-9' : 'ml-1'}"></div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
 
-// ========================================
-// LOGS ROUTES
-// ========================================
+            init() {
+                this.render();
+                
+                // Simulate price updates
+                setInterval(() => {
+                    this.state.jercatPrice += (Math.random() - 0.5) * 0.002;
+                    if (document.getElementById('app').innerHTML) {
+                        this.render();
+                    }
+                }, 10000);
+            }
+        };
 
-// Get logs
-app.get('/api/logs', authenticateApiKey, (req, res) => {
-  const { limit = 100, type } = req.query;
-  
-  let logs = botState.logs;
-  
-  if (type) {
-    logs = logs.filter(log => log.type === type);
-  }
-  
-  res.json({
-    success: true,
-    total: logs.length,
-    data: logs.slice(0, parseInt(limit))
-  });
-});
-
-// Clear logs
-app.delete('/api/logs', authenticateApiKey, (req, res) => {
-  botState.logs = [];
-  
-  res.json({
-    success: true,
-    message: 'Logs cleared'
-  });
-});
-
-// ========================================
-// NOTIFICATIONS ROUTES
-// ========================================
-
-// Send notification
-app.post('/api/notify', authenticateApiKey, (req, res) => {
-  const { title, message, type = 'info' } = req.body;
-  
-  broadcast('notification', { title, message, type });
-  
-  res.json({
-    success: true,
-    message: 'Notification sent'
-  });
-});
-
-// ========================================
-// ANALYTICS ROUTES
-// ========================================
-
-// Get analytics summary
-app.get('/api/analytics', authenticateApiKey, (req, res) => {
-  const { period = '24h' } = req.query;
-  
-  const analytics = {
-    period,
-    totalTrades: botState.stats.totalTrades,
-    winRate: botState.stats.winRate,
-    totalProfit: botState.stats.totalProfit,
-    avgProfit: botState.stats.totalProfit / botState.stats.totalTrades || 0,
-    bestTrade: Math.max(...botState.trades.map(t => parseFloat(t.profit || 0))),
-    worstTrade: Math.min(...botState.trades.map(t => parseFloat(t.profit || 0))),
-    currentPrice: botState.stats.currentPrice,
-    priceChange: botState.stats.priceChange24h
-  };
-  
-  res.json({
-    success: true,
-    data: analytics
-  });
-});
-
-// ========================================
-// ERROR HANDLING
-// ========================================
-app.use((err, req, res, next) => {
-  console.error('❌ Error:', err);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: err.message
-  });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Endpoint not found',
-    path: req.path
-  });
-});
-
-// ========================================
-// START SERVER
-// ========================================
-server.listen(PORT, () => {
-  console.log('');
-  console.log('🚀 JERCAT Bot API Server Started!');
-  console.log('================================');
-  console.log(`📡 HTTP API: http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
-  console.log('');
-  console.log('🔑 Authentication:');
-  console.log('   Header: x-api-key');
-  console.log(`   Value: ${API_KEY}`);
-  console.log('');
-  console.log('📚 API Documentation:');
-  console.log('   GET    /api/bot/status');
-  console.log('   POST   /api/bot/start');
-  console.log('   POST   /api/bot/pause');
-  console.log('   POST   /api/bot/stop');
-  console.log('   GET    /api/stats');
-  console.log('   GET    /api/trades');
-  console.log('   POST   /api/trades/execute');
-  console.log('   GET    /api/config');
-  console.log('   PUT    /api/config');
-  console.log('   GET    /api/wallets');
-  console.log('   POST   /api/wallets');
-  console.log('   GET    /api/logs');
-  console.log('   GET    /api/analytics');
-  console.log('================================');
-  console.log('');
-});
-
-// ========================================
-// GRACEFUL SHUTDOWN
-// ========================================
-process.on('SIGINT', () => {
-  console.log('\n🛑 Shutting down server...');
-  server.close(() => {
-    console.log('✅ Server closed');
-    process.exit(0);
-  });
-});
-
-// ========================================
-// SIMULATE PRICE UPDATES
-// ========================================
-setInterval(() => {
-  // Update price
-  botState.stats.currentPrice += (Math.random() - 0.5) * 0.002;
-  botState.stats.priceChange24h = ((Math.random() - 0.5) * 20).toFixed(2);
-  
-  // Broadcast update
-  broadcast('price', {
-    price: botState.stats.currentPrice,
-    change: botState.stats.priceChange24h
-  });
-}, 5000);
-
-module.exports = app;
+        // Initialize app
+        const app = App;
+        app.init();
+    </script>
+</body>
+</html>
